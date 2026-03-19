@@ -740,15 +740,21 @@ func (runner *Runner) runWorker(ctx context.Context, delay time.Duration, id str
 }
 
 type reporter interface {
-	Report() map[string]interface{}
+	Report(ctx context.Context) map[string]interface{}
 }
 
 // Report implements Reporter.
-func (runner *Runner) Report() map[string]interface{} {
+func (runner *Runner) Report(ctx context.Context) map[string]interface{} {
+	if ctx.Err() != nil {
+		return nil
+	}
 	workers := make(map[string]interface{})
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 	for id, info := range runner.workers {
+		if ctx.Err() != nil {
+			return nil
+		}
 		worker := info.worker
 		workerReport := map[string]interface{}{
 			KeyState: info.status(),
@@ -758,7 +764,7 @@ func (runner *Runner) Report() map[string]interface{} {
 		}
 		if worker != nil {
 			if r, ok := worker.(reporter); ok {
-				if report := r.Report(); len(report) > 0 {
+				if report := r.Report(ctx); len(report) > 0 {
 					workerReport[KeyReport] = report
 				}
 			}
